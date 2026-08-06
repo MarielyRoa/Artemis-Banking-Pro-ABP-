@@ -4,9 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ABP.Infrastructure.Identity.Seeds
+namespace ABP.Core.Domain.Common.Enums
 {
-    internal class Class1
+    public enum UserRoles
     {
+        Admin = 1,
+        Cashier = 2,
+        Client = 3
     }
 }

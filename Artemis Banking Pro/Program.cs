@@ -1,9 +1,21 @@
+using ABP.Infrastructure.Identity;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+builder.Services.AddSession(opt =>
+{
+    opt.IdleTimeout = TimeSpan.FromMinutes(60);
+    opt.Cookie.HttpOnly = true;
+});
+
+builder.Services.AddIdentityLayerIocForWebApp(builder.Configuration);
+
 var app = builder.Build();
+
+await app.Services.RunIdentitySeedAsync();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

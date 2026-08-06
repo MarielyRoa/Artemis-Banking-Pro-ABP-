@@ -7,4 +7,8 @@
     <RootNamespace>Artemis_Banking_Pro</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ABP.Infrastructure.Identity\ABP.Infrastructure.Identity.csproj" />
+  </ItemGroup>
+
 </Project>
