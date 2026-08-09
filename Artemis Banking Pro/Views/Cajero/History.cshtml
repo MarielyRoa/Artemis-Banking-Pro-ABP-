@@ -1,0 +1,45 @@
+@model ABP.Core.Application.Dtos.Cashier.OperationHistoryDto
+
+@{ ViewData["Title"] = "Historial de Operaciones"; }
+
+<h2 class="title" style="font-family:'Inter',sans-serif;color:#2c3e50;">@ViewData["Title"]</h2>
+
+<table class="table table-hover" style="margin-top:1rem;">
+    <thead class="thead-light">
+        <tr>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Origen</th>
+            <th>Beneficiario</th>
+            <th>Monto</th>
+            <th>Estado</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var op in Model.Operations)
+        {
+            <tr>
+                <td>@op.Date.ToString("dd/MM/yyyy HH:mm")</td>
+                <td>@op.Type</td>
+                <td>@op.Origin</td>
+                <td>@op.Beneficiary</td>
+                <td>@op.Amount.ToString("C")</td>
+                <td>@op.Status</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div class="pagination" style="margin-top:1rem;">
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            <li class="page-item @(Model.PageNumber == 1 ? "disabled" : "")">
+                <a class="page-link" asp-action="History" asp-route-page="@(Model.PageNumber - 1)" asp-route-pageSize="@Model.PageSize">Anterior</a>
+            </li>
+            <li class="page-item disabled"><span class="page-link">Página @Model.PageNumber</span></li>
+            <li class="page-item @(Model.HasNextPage ? "" : "disabled")">
+                <a class="page-link" asp-action="History" asp-route-page="@(Model.PageNumber + 1)" asp-route-pageSize="@Model.PageSize">Siguiente</a>
+            </li>
+        </ul>
+    </nav>
+</div>

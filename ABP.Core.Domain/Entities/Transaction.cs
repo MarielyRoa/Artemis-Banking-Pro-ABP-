@@ -14,6 +14,7 @@ namespace ABP.Core.Domain.Entities
         public string Origin { get; set; } = string.Empty;
         public TransactionStatus Status { get; set; }
         public string? ResponsibleUserId { get; set; } // Cajero autenticado o null si fue el cliente
+        public string UserId { get; set; } = string.Empty; // Id del cajero que ejecuta la operación
 
         public SavingAccount SavingAccount { get; set; } = null!;
     }

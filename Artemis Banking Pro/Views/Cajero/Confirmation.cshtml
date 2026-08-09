@@ -1,0 +1,10 @@
+@model ABP.Core.Application.Dtos.Cashier.OperationConfirmationDto
+
+@{ ViewData["Title"] = "Confirmación"; }
+
+<div class="confirmation-container" style="display:flex;flex-direction:column;align-items:center;margin-top:2rem;">
+    <h2 class="title" style="font-family:'Inter',sans-serif;color:#2c3e50;">@ViewData["Title"]</h2>
+    <p class="message" style="font-size:1.2rem;color:#34495e;">@Model.Message</p>
+    <p class="transaction-id" style="font-weight:600;">ID de transacción: <span style="color:#e74c3c;">@Model.TransactionId</span></p>
+    <a asp-action="Dashboard" class="btn btn-primary" style="margin-top:1.5rem;">Volver al inicio</a>
+</div>
