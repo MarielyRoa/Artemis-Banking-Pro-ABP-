@@ -1,15 +1,18 @@
 ﻿using ABP.Core.Application.Dtos.User;
+using ABP.Core.Application.Interfaces;
+using ABP.Core.Domain.Common.Enums;
 using ABP.Infrastructure.Identity.Entities;
 using Microsoft.AspNetCore.Identity;
 
 namespace ABP.Infrastructure.Identity.Services
 {
-    public class AccountServiceWebApp
+    public class AccountServiceWebApp : BaseAccountService, IAccountServiceWebApp
     {
         private readonly UserManager<AppUser> _userManager;
-        private SignInManager<AppUser> _signInManager;
+        private readonly SignInManager<AppUser> _signInManager;
 
-        public AccountServiceWebApp(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager)
+        public AccountServiceWebApp(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, IEmailService emailService)
+            : base(userManager, emailService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -28,9 +31,9 @@ namespace ABP.Infrastructure.Identity.Services
                 Errors = []
             };
 
-            var user = await _userManager.FindByNameAsync(loginDto.Username);
+            var user = await _userManager.FindByEmailAsync(loginDto.Username) ?? await _userManager.FindByNameAsync(loginDto.Username);
 
-            if(user == null)
+            if (user == null)
             {
                 responseDto.HasError = true;
                 responseDto.Errors.Add($"No existe ninguna cuenta con {loginDto.Username}");
@@ -54,16 +57,31 @@ namespace ABP.Infrastructure.Identity.Services
                 return responseDto;
             }
 
-            var result = await _signInManager.PasswordSignInAsync(loginDto.Username ?? "", loginDto.Password, false, true);
+            var roleList = await _userManager.GetRolesAsync(user);
+
+            if (roleList.Contains(UserRoles.Trade.ToString()))
+            {
+                responseDto.HasError = true;
+                responseDto.Errors.Add("No tiene permisos para acceder a la API web.");
+                return responseDto;
+            }
+
+            var result = await _signInManager.PasswordSignInAsync(user.UserName!, loginDto.Password, false, true);
 
             if (!result.Succeeded)
             {
                 responseDto.HasError = true;
-                responseDto.Errors.Add($"La cuenta está bloqueada temporalmente por múltiples intentos fallidos.");
+
+                if (result.IsLockedOut)
+                {
+                    responseDto.Errors.Add($"La cuenta está bloqueada temporalmente por múltiples intentos fallidos.");
+                }
+                else
+                {
+                    responseDto.Errors.Add($"Credenciales inválidas para el usuario {loginDto.Username}");
+                }
                 return responseDto;
             }
-
-            var roleList = await _userManager.GetRolesAsync(user);
 
             responseDto.Id = user.Id;
             responseDto.Email = user.Email ?? "";
@@ -79,56 +97,6 @@ namespace ABP.Infrastructure.Identity.Services
         public async Task SignOutAsync()
         {
             await _signInManager.SignOutAsync();
-        }
-
-        public async Task<RegisterResponseDto> RegisterUser(SaveUserDto saveDto)
-        {
-            RegisterResponseDto responseDto = new()
-            {
-                HasError = false,
-                Errors = []
-            };
-
-            var userWithSameUsername = await _userManager.FindByNameAsync(saveDto.Username);
-            if (userWithSameUsername != null)
-            {
-                responseDto.HasError = true;
-                responseDto.Errors.Add($"El nombre de usuario ya existe");
-
-                return responseDto;
-            }
-
-            var userWithSameEmail = await _userManager.FindByEmailAsync(saveDto.Email);
-            if (userWithSameEmail != null)
-            {
-                responseDto.HasError = true;
-                responseDto.Errors.Add($"Ya existe un usuario con este email.");
-
-                return responseDto;
-            }
-
-            AppUser user = new AppUser()
-            {
-                Name = saveDto.FirstName ?? "",
-                LastName = saveDto.LastName ?? "",
-                Email = saveDto.Email,
-                ProfileImage = saveDto.ProfileImage,
-                EmailConfirmed = false
-            };
-
-            var result = await _userManager.CreateAsync(user, saveDto.Password);
-
-            if (result.Succeeded)
-            {
-                await _userManager.AddToRoleAsync(user, saveDto.Password);
-            }
-            else
-            {
-                responseDto.HasError = true;
-                responseDto.Errors.Add($"Ocurrio un error al registrar el usuario");
-            }
-
-            return responseDto;
         }
     }
 }

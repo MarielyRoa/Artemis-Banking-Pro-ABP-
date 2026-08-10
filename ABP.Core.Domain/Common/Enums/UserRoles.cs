@@ -10,6 +10,7 @@ namespace ABP.Core.Domain.Common.Enums
     {
         Admin = 1,
         Cashier = 2,
-        Client = 3
+        Client = 3,
+        Trade = 4
     }
 }
