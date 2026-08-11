@@ -17,6 +17,9 @@ namespace ABP.Core.Application
 
             services.AddTransient<IBeneficiaryService, BeneficiaryService>();
             services.AddTransient<ITransactionService, TransactionService>();
+            services.AddTransient<ILoanService, LoanService>();
+            services.AddTransient<ICreditCardService, CreditCardService>();
+            services.AddTransient<ISavingAccountService, SavingAccountService>();
         }
     }
 }
