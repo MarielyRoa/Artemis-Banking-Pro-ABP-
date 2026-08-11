@@ -2,6 +2,8 @@ using ABP.Core.Application.Interfaces;
 using ABP.Core.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using MediatR;
+using System.Reflection;
 
 namespace ABP.Core.Application
 {
@@ -13,6 +15,7 @@ namespace ABP.Core.Application
             services.AddAutoMapper(config =>
             {
                 config.AddMaps(Assembly.GetExecutingAssembly());
+
             });
 
             services.AddTransient<IBeneficiaryService, BeneficiaryService>();
@@ -20,6 +23,8 @@ namespace ABP.Core.Application
             services.AddTransient<ILoanService, LoanService>();
             services.AddTransient<ICreditCardService, CreditCardService>();
             services.AddTransient<ISavingAccountService, SavingAccountService>();
+            services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
+
         }
     }
 }
