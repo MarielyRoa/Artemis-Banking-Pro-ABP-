@@ -66,6 +66,13 @@ namespace ABP.Infrastructure.Identity.Services
                 return responseDto;
             }
 
+            if (user.IsActive)
+            {
+                responseDto.HasErrors = true;
+                responseDto.Message = "La cuenta ya está activada.";
+                return responseDto;
+            }
+
             token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(token));
             var result = await _userManager.ConfirmEmailAsync(user, token);
 
