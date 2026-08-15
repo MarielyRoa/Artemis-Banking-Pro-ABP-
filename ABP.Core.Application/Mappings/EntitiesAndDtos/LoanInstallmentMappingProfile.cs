@@ -1,7 +1,6 @@
-﻿using ABP.Core.Application.Dtos.Loans;
-using ABP.Core.Domain.Entities;
 using AutoMapper;
-
+using ABP.Core.Application.Dtos.Loans;
+using ABP.Core.Domain.Entities;
 
 namespace ABP.Core.Application.Mappings.EntitiesAndDtos
 {

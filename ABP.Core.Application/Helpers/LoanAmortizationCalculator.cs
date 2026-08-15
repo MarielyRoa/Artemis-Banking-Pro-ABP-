@@ -1,6 +1,7 @@
-﻿using ABP.Core.Domain.Common.Enums;
+using System;
+using System.Collections.Generic;
+using ABP.Core.Domain.Common.Enums;
 using ABP.Core.Domain.Entities;
-
 
 namespace ABP.Core.Application.Helpers
 {
@@ -43,13 +44,12 @@ namespace ABP.Core.Application.Helpers
 
                 installments.Add(new LoanInstallment
                 {
-                    Id = 0,
                     InstallmentNumber = i,
                     DueDate = startDate.AddMonths(i),
                     InstallmentAmount = interest + capital,
                     InterestAmount = interest,
                     CapitalAmount = capital,
-                    PendingAmount = balance,
+                    PendingAmount = interest + capital, // Start with full amount pending
                     PaymentStatus = PaymentStatus.Pending,
                     IsLate = false
                 });

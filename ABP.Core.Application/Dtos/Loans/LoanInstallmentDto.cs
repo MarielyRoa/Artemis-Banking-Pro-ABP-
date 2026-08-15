@@ -1,5 +1,5 @@
-﻿using ABP.Core.Domain.Common.Enums;
-
+using ABP.Core.Domain.Common.Enums;
+using System;
 
 namespace ABP.Core.Application.Dtos.Loans
 {

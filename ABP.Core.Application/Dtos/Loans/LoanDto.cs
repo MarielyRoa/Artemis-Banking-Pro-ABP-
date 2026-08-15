@@ -1,5 +1,5 @@
-﻿using ABP.Core.Domain.Common.Enums;
-
+using ABP.Core.Domain.Common.Enums;
+using System.Collections.Generic;
 
 namespace ABP.Core.Application.Dtos.Loans
 {
@@ -13,8 +13,11 @@ namespace ABP.Core.Application.Dtos.Loans
         public int TermInMonths { get; set; }
         public LoanStatus Status { get; set; }
         public string AssignedByUserId { get; set; } = string.Empty;
+
         public int TotalInstallments { get; set; }
         public int PaidInstallments { get; set; }
         public string ClientPaymentStatus { get; set; } = string.Empty;
+
+        public ICollection<LoanInstallmentDto> LoanInstallments { get; set; } = new List<LoanInstallmentDto>();
     }
 }
