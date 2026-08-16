@@ -1,5 +1,12 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Models;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace Artemis_Banking_Pro_WebApi.Extensions
 {
@@ -9,7 +16,7 @@ namespace Artemis_Banking_Pro_WebApi.Extensions
         {
             services.AddSwaggerGen(options =>
             {
-                List<string> xmlFiles = Directory.GetFiles(AppContext.BaseDirectory, ".xml", searchOption: SearchOption.TopDirectoryOnly).ToList();
+                List<string> xmlFiles = Directory.GetFiles(AppContext.BaseDirectory, "*.xml", SearchOption.TopDirectoryOnly).ToList();
                 xmlFiles.ForEach(xmlFile => options.IncludeXmlComments(xmlFile));
 
                 options.SwaggerDoc("v1", new OpenApiInfo
@@ -20,7 +27,7 @@ namespace Artemis_Banking_Pro_WebApi.Extensions
                     Contact = new OpenApiContact
                     {
                         Name = "ArtemisBankingApp Developers",
-                        Email = "eliefontgonzalez@gmail.com"
+                        Email = "corage1920@gmail.com"
                     }
                 });
 

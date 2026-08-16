@@ -1,4 +1,4 @@
-﻿using ABP.Core.Application.Interfaces;
+using ABP.Core.Application.Interfaces;
 using ABP.Core.Domain.Settings;
 using ABP.Infrastructure.Identity.Contexts;
 using ABP.Infrastructure.Identity.Entities;
@@ -59,8 +59,8 @@ namespace ABP.Infrastructure.Identity
             {
                 opt.ExpireTimeSpan = TimeSpan.FromMinutes(180);
                 opt.SlidingExpiration = true;
-                opt.LoginPath = "/Login";
-                opt.AccessDeniedPath = "/Login/AccessDenied";
+                opt.LoginPath = "/Account/Index";
+                opt.AccessDeniedPath = "/Account/AccessDenied";
             });
             #endregion
 
@@ -191,6 +191,7 @@ namespace ABP.Infrastructure.Identity
             await DefaultAdminUser.SeedAsync(userManager);
             await DefaultCashierUser.SeedAsync(userManager);
             await DefaultClientUser.SeedAsync(userManager);
+            await DefaultCommerceUser.SeedAsync(userManager);
         }
 
         private static void GeneralConfiguration(IServiceCollection services, IConfiguration config)
@@ -209,7 +210,10 @@ namespace ABP.Infrastructure.Identity
                     (serviceProvider, opt) =>
                     {
                         opt.UseSqlServer(connectionString,
-                        m => m.MigrationsAssembly(typeof(IdentityContext).Assembly.FullName));
+                        m => {
+                            m.MigrationsAssembly(typeof(IdentityContext).Assembly.FullName);
+                            m.EnableRetryOnFailure();
+                        });
                     },
                     contextLifetime: ServiceLifetime.Scoped,
                     optionsLifetime: ServiceLifetime.Scoped

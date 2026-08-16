@@ -1,22 +1,18 @@
 ﻿using ABP.Infrastructure.Identity.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace ABP.Infrastructure.Identity.Contexts
 {
     public class IdentityContext : IdentityDbContext<AppUser>
     {
-        public IdentityContext(DbContextOptions<IdentityContext> options) : base(options) {}
+        public IdentityContext(DbContextOptions<IdentityContext> options) : base(options) { }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
-            //Fluent API
+            
             base.OnModelCreating(builder);
             builder.HasDefaultSchema("Identity");
 

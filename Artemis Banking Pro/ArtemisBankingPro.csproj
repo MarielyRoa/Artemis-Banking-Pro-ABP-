@@ -8,7 +8,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ABP.Core.Application\ABP.Core.Application.csproj" />
+    <ProjectReference Include="..\ABP.Core.Domain\ABP.Core.Domain.csproj" />
     <ProjectReference Include="..\ABP.Infrastructure.Identity\ABP.Infrastructure.Identity.csproj" />
+    <ProjectReference Include="..\ABP.Infrastructure.Persistence\ABP.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="..\ABP.Infrastructure.Shared\ABP.Infrastructure.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Controllers\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.8">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
   </ItemGroup>
 
 </Project>
+

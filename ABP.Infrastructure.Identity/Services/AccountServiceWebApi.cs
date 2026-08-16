@@ -1,4 +1,4 @@
-﻿using ABP.Core.Application.Dtos.User;
+using ABP.Core.Application.Dtos.User;
 using ABP.Core.Application.Interfaces;
 using ABP.Core.Domain.Common.Enums;
 using ABP.Core.Domain.Settings;
@@ -28,20 +28,19 @@ namespace ABP.Infrastructure.Identity.Services
         {
             LoginResponseApiDto responseDto = new()
             {
-                Id = "",
-                FirstName = "",
+                Name = "",
                 LastName = "",
-                Username = "",
+                UserName = "",
                 HasError = false,
                 Errors = []
             };
 
-            var user = await _userManager.FindByEmailAsync(loginDto.Username) ?? await _userManager.FindByNameAsync(loginDto.Username);
+            var user = await _userManager.FindByEmailAsync(loginDto.UserName) ?? await _userManager.FindByNameAsync(loginDto.UserName);
 
             if (user == null)
             {
                 responseDto.HasError = true;
-                responseDto.Errors.Add($"No existe ninguna cuenta con {loginDto.Username}");
+                responseDto.Errors.Add($"No existe ninguna cuenta con {loginDto.UserName}");
                 return responseDto;
             }
 
@@ -64,13 +63,13 @@ namespace ABP.Infrastructure.Identity.Services
             if(!result)
             {
                 responseDto.HasError= true;
-                responseDto.Errors.Add($"Credenciales inválidas para el usuario {loginDto.Username}");
+                responseDto.Errors.Add($"Credenciales inválidas para el usuario {loginDto.UserName}");
                 return responseDto;
             }
 
             var roleList = await _userManager.GetRolesAsync(user);
 
-            if (!roleList.Contains(UserRoles.Admin.ToString()) && !roleList.Contains(UserRoles.Trade.ToString()))
+            if (!roleList.Contains(UserRoles.Admin.ToString()) && !roleList.Contains(UserRoles.Commerce.ToString()))
             {
                 responseDto.HasError = true;
                 responseDto.Errors.Add("No tiene permisos para acceder a la API web.");
@@ -79,9 +78,9 @@ namespace ABP.Infrastructure.Identity.Services
 
             JwtSecurityToken jwtToken = await GenerateJwtToken(user);
 
-            responseDto.FirstName = user.Name;
+            responseDto.Name = user.Name;
             responseDto.LastName = user.LastName;
-            responseDto.Username = user.UserName ?? "";
+            responseDto.UserName = user.UserName ?? "";
             responseDto.AccessToken = new JwtSecurityTokenHandler().WriteToken(jwtToken);
             responseDto.Roles = roleList.ToList();
             responseDto.Expiration = jwtToken.ValidTo;
@@ -114,7 +113,7 @@ namespace ABP.Infrastructure.Identity.Services
             }
 
             var issuedAt = DateTime.UtcNow;
-            var expiration = issuedAt.AddMinutes(_jwtSettings.ExpirationMinutes);
+            var expiration = issuedAt.AddMinutes(_jwtSettings.DurationInMinutes);
 
             var claims = new[]
             {
@@ -125,7 +124,7 @@ namespace ABP.Infrastructure.Identity.Services
             }.Union(userClaims)
              .Union(roleClaims);
 
-            var symmetricSecurityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecurityKey));
+            var symmetricSecurityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
             var signingCredentials = new SigningCredentials(symmetricSecurityKey, SecurityAlgorithms.HmacSha256);
 
             var jwtSecurityToken = new JwtSecurityToken(

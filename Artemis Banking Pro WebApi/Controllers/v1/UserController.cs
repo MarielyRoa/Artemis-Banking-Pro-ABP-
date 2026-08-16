@@ -1,4 +1,4 @@
-﻿using ABP.Core.Application.Dtos.User;
+using ABP.Core.Application.Dtos.User;
 using ABP.Core.Application.Interfaces;
 using ABP.Core.Domain.Common.Enums;
 using ABP.Infrastructure.Identity.Entities;
@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Artemis_Banking_Pro_WebApi.Controllers.v1
 {
-    [Authorize(Roles = "Admin,Trade")]
+    [Authorize(Roles = "Admin,Commerce")]
     [ApiVersion("1.0")]
     public class UserController : BaseApiController
     {
@@ -23,8 +23,8 @@ namespace Artemis_Banking_Pro_WebApi.Controllers.v1
         }
 
         [Authorize(Roles = nameof(UserRoles.Admin))]
-        [HttpGet("/users")]
-        [ProducesResponseType(StatusCodes.Status201Created)]
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -33,7 +33,14 @@ namespace Artemis_Banking_Pro_WebApi.Controllers.v1
             try
             {
                 var users = await _accountService.GetAllUser();
-                var validUsers = users.Where(u => u.Role != UserRoles.Trade.ToString()).ToList();
+                
+                var allowedRoles = new List<string> { 
+                    UserRoles.Admin.ToString(), 
+                    UserRoles.Cashier.ToString(), 
+                    UserRoles.Client.ToString() 
+                };
+
+                var validUsers = users.Where(u => u.Roles != null && u.Roles.Any(r => allowedRoles.Contains(r))).ToList();
 
                 return Ok(validUsers);
             }

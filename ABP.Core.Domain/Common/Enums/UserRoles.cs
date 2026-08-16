@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,6 +11,6 @@ namespace ABP.Core.Domain.Common.Enums
         Admin = 1,
         Cashier = 2,
         Client = 3,
-        Trade = 4
+        Commerce = 4
     }
 }

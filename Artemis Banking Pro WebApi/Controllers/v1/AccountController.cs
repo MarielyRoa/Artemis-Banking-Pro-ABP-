@@ -1,4 +1,4 @@
-﻿using ABP.Core.Application.Dtos.User;
+using ABP.Core.Application.Dtos.User;
 using ABP.Core.Application.Interfaces;
 using ABP.Core.Domain.Common.Enums;
 using ABP.Infrastructure.Identity.Entities;
@@ -45,7 +45,7 @@ namespace Artemis_Banking_Pro_WebApi.Controllers.v1
                 return Ok(new JwtResponseDto
                 {
                     Token = response.AccessToken,
-                    User = response.Username,
+                    User = response.UserName,
                     Roles = response.Roles ?? [],
                     Expiration = response.Expiration,
                     HasError = false
@@ -69,7 +69,7 @@ namespace Artemis_Banking_Pro_WebApi.Controllers.v1
             }
             var response = await _accountService.ConfirmAccountAsync(request.UserId, request.Token);
 
-            if (response.HasErrors)
+            if (response.HasError)
             {
                 return BadRequest(response);
             }
@@ -78,7 +78,7 @@ namespace Artemis_Banking_Pro_WebApi.Controllers.v1
         }
 
         [Authorize(Roles = "Admin")]
-        [HttpPost("users/commerce/{commerceId}")]
+        [HttpPost("users/commerce")]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -99,7 +99,7 @@ namespace Artemis_Banking_Pro_WebApi.Controllers.v1
                     return BadRequest(new { Error = "Password y la confirmacion del password no coinciden " });
                 }
 
-                registerDto.Role = UserRoles.Trade.ToString();
+                registerDto.Role = UserRoles.Commerce.ToString();
                 registerDto.IsActive = true;
 
                 var result = await _accountService.RegisterUser(registerDto, null, true);

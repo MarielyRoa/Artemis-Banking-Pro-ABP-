@@ -1,4 +1,4 @@
-﻿using ABP.Core.Application.Dtos.Email;
+using ABP.Core.Application.Dtos.Email;
 using ABP.Core.Application.Dtos.User;
 using ABP.Core.Application.Interfaces;
 using ABP.Core.Domain.Common.Enums;
@@ -27,13 +27,13 @@ namespace ABP.Infrastructure.Identity.Services
 
             UserResponseDto responseDto = new()
             {
-                HasErrors = false,
+                HasError = false,
                 Errors = []
             };
 
             if(user == null)
             {
-                responseDto.HasErrors = true;
+                responseDto.HasError = true;
                 responseDto.Errors.Add("No existe una cuenta registrada para este usuario.");
             }
 
@@ -41,7 +41,7 @@ namespace ABP.Infrastructure.Identity.Services
 
             if (!result.Succeeded)
             {
-                responseDto.HasErrors = true;
+                responseDto.HasError = true;
                 responseDto.Errors = result.Errors.Select(e => e.Description).ToList();
             }
 
@@ -52,7 +52,7 @@ namespace ABP.Infrastructure.Identity.Services
         {
             UserResponseDto responseDto = new() 
             { 
-                HasErrors = false, 
+                HasError = false, 
                 Errors = [] 
             };
 
@@ -61,14 +61,14 @@ namespace ABP.Infrastructure.Identity.Services
             if(user == null)
             {
                 responseDto.Message = "No existe una cuenta registrada para este usuario.";
-                responseDto.HasErrors = true;
+                responseDto.HasError = true;
                 
                 return responseDto;
             }
 
             if (user.IsActive)
             {
-                responseDto.HasErrors = true;
+                responseDto.HasError = true;
                 responseDto.Message = "La cuenta ya está activada.";
                 return responseDto;
             }
@@ -81,13 +81,13 @@ namespace ABP.Infrastructure.Identity.Services
                 user.IsActive = true;
                 await _userManager.UpdateAsync(user);
                 responseDto.Message = $"Cuenta confirmada para {user.Email}. Ya puedes iniciar sesión.";
-                responseDto.HasErrors = false;
+                responseDto.HasError = false;
                 return responseDto;
             }
             else
             {
                 responseDto.Message = $"Ocurrió un error al confirmar el correo {user.Email}.";
-                responseDto.HasErrors= true;
+                responseDto.HasError = true;
                 return responseDto;
             }
         }
@@ -96,7 +96,7 @@ namespace ABP.Infrastructure.Identity.Services
         {
             UserResponseDto responserDto = new()
             {
-                HasErrors = false,
+                HasError = false,
                 Errors = []
             };
 
@@ -104,7 +104,7 @@ namespace ABP.Infrastructure.Identity.Services
 
             if(user == null)
             {
-                responserDto.HasErrors = true;
+                responserDto.HasError = true;
                 responserDto.Errors.Add("No existe una cuenta registrada para este usuario.");
                 return responserDto;
             }
@@ -115,10 +115,13 @@ namespace ABP.Infrastructure.Identity.Services
 
         public virtual async Task<EditResponseDto> EditUser(SaveUserDto saveDto, string? origin, bool? isCreated = false, bool? isApi = false)
         {
-            saveDto.FirstName = saveDto.FirstName;
-            saveDto.LastName = saveDto.LastName;
-            saveDto.Username = saveDto.Username;
-            saveDto.Email = saveDto.Email;
+            if (!string.IsNullOrWhiteSpace(saveDto.DNI))
+                saveDto.DNI = saveDto.DNI.Replace("-", "");
+
+            saveDto.FirstName = saveDto.FirstName?.Trim()!;
+            saveDto.LastName = saveDto.LastName?.Trim()!;
+            saveDto.UserName = saveDto.UserName?.Trim()!;
+            saveDto.Email = saveDto.Email?.Trim()!;
 
             bool isNotCreated = !(isCreated ?? false);
 
@@ -133,7 +136,7 @@ namespace ABP.Infrastructure.Identity.Services
                 Errors = []
             };
 
-            var normalizedUsername = saveDto.Username?.ToUpper();
+            var normalizedUsername = saveDto.UserName?.ToUpper();
             var userWithSameUsername = await _userManager.Users.FirstOrDefaultAsync(w => w.NormalizedUserName == normalizedUsername && w.Id != saveDto.Id);
 
             if (userWithSameUsername != null)
@@ -141,6 +144,17 @@ namespace ABP.Infrastructure.Identity.Services
                 responseDto.HasError = true;
                 responseDto.Errors.Add("Ya existe un usuario registrado con este nombre de usuario.");
                 return responseDto;
+            }
+
+            if (!string.IsNullOrWhiteSpace(saveDto.DNI))
+            {
+                var userWithSameDni = await _userManager.Users.FirstOrDefaultAsync(w => w.Identification == saveDto.DNI && w.Id != saveDto.Id);
+                if (userWithSameDni != null)
+                {
+                    responseDto.HasError = true;
+                    responseDto.Errors.Add("Ya existe un usuario registrado con esta cédula.");
+                    return responseDto;
+                }
             }
 
             var user = await _userManager.FindByIdAsync(saveDto.Id ?? string.Empty);
@@ -154,7 +168,9 @@ namespace ABP.Infrastructure.Identity.Services
 
             user.Name = saveDto.FirstName;
             user.LastName = saveDto.LastName;
-            user.UserName = saveDto.Username;
+            user.UserName = saveDto.UserName;
+            user.Identification = saveDto.DNI;
+            user.ProfileImage = string.IsNullOrWhiteSpace(saveDto.PhotoUrl) ? user.ProfileImage : saveDto.PhotoUrl;
             user.EmailConfirmed = user.EmailConfirmed && user.Email == saveDto.Email;
             user.Email = saveDto.Email;
             user.PhoneNumber = saveDto.PhoneNumber ?? string.Empty;
@@ -229,7 +245,7 @@ namespace ABP.Infrastructure.Identity.Services
         {
             UserResponseDto responseDto = new()
             {
-                HasErrors = false,
+                HasError = false,
                 Errors = []
             };
 
@@ -247,7 +263,7 @@ namespace ABP.Infrastructure.Identity.Services
 
             if(user == null)
             {
-                responseDto.HasErrors = true;
+                responseDto.HasError = true;
                 responseDto.Errors.Add("No existe una cuenta registrada para este usuario.");
 
                 return responseDto;
@@ -304,9 +320,11 @@ namespace ABP.Infrastructure.Identity.Services
                     Email = item.Email ?? "",
                     LastName = item.LastName,
                     FirstName = item.Name,
-                    Username = item.UserName ?? "",
+                    UserName = item.UserName ?? "",
                     PhoneNumber = item.PhoneNumber,
-                    Role = roleList.FirstOrDefault() ?? "",
+                    DNI = item.Identification,
+                    PhotoUrl = item.ProfileImage,
+                    Roles = roleList.ToList(),
                     IsActive = item.IsActive
                 });
             }
@@ -330,9 +348,11 @@ namespace ABP.Infrastructure.Identity.Services
                 Email = user.Email ?? "",
                 LastName = user.LastName,
                 FirstName = user.Name,
-                Username = user.UserName ?? "",
+                UserName = user.UserName ?? "",
                 PhoneNumber = user.PhoneNumber,
-                Role = roleList.FirstOrDefault() ?? "",
+                DNI = user.Identification,
+                PhotoUrl = user.ProfileImage,
+                Roles = roleList.ToList(),
                 IsActive = user.IsActive
             };
 
@@ -356,9 +376,11 @@ namespace ABP.Infrastructure.Identity.Services
                 Email = user.Email ?? "",
                 LastName = user.LastName,
                 FirstName = user.Name,
-                Username = user.UserName ?? "",
+                UserName = user.UserName ?? "",
                 PhoneNumber = user.PhoneNumber,
-                Role = roleList.FirstOrDefault() ?? "",
+                DNI = user.Identification,
+                PhotoUrl = user.ProfileImage,
+                Roles = roleList.ToList(),
                 IsActive = user.IsActive
             };
 
@@ -382,9 +404,11 @@ namespace ABP.Infrastructure.Identity.Services
                 Email = user.Email ?? "",
                 LastName = user.LastName,
                 FirstName = user.Name,
-                Username = user.UserName ?? "",
+                UserName = user.UserName ?? "",
                 PhoneNumber = user.PhoneNumber,
-                Role = roleList.FirstOrDefault() ?? "",
+                DNI = user.Identification,
+                PhotoUrl = user.ProfileImage,
+                Roles = roleList.ToList(),
                 IsActive = user.IsActive
             };
 
@@ -393,7 +417,10 @@ namespace ABP.Infrastructure.Identity.Services
 
         public virtual async Task<RegisterResponseDto> RegisterUser(SaveUserDto saveDto, string? origin, bool? isApi = false)
         {
-            saveDto.Username = saveDto.Username?.Trim()!;
+            if (!string.IsNullOrWhiteSpace(saveDto.DNI))
+                saveDto.DNI = saveDto.DNI.Replace("-", "");
+
+            saveDto.UserName = saveDto.UserName?.Trim()!;
             saveDto.Email = saveDto.Email?.Trim()!;
             saveDto.FirstName = saveDto.FirstName?.Trim()!;
             saveDto.LastName = saveDto.LastName?.Trim()!;
@@ -409,7 +436,7 @@ namespace ABP.Infrastructure.Identity.Services
                 Errors = []
             };
 
-            var userWithSameUsername = await _userManager.FindByNameAsync(saveDto.Username!);
+            var userWithSameUsername = await _userManager.FindByNameAsync(saveDto.UserName!);
             if (userWithSameUsername != null)
             {
                 responseDto.HasError = true;
@@ -427,12 +454,24 @@ namespace ABP.Infrastructure.Identity.Services
                 return responseDto;
             }
 
+            if (!string.IsNullOrWhiteSpace(saveDto.DNI))
+            {
+                var userWithSameDni = await _userManager.Users.FirstOrDefaultAsync(u => u.Identification == saveDto.DNI);
+                if (userWithSameDni != null)
+                {
+                    responseDto.HasError = true;
+                    responseDto.Errors.Add("Ya existe un usuario registrado con esta cédula.");
+                    return responseDto;
+                }
+            }
+
             AppUser user = new AppUser()
             {
                 Name = saveDto.FirstName ?? "",
                 LastName = saveDto.LastName ?? "",
+                Identification = saveDto.DNI,
                 Email = saveDto.Email,
-                ProfileImage = saveDto.ProfileImage,
+                ProfileImage = saveDto.PhotoUrl ?? string.Empty,
                 EmailConfirmed = false
             };
 
@@ -442,11 +481,11 @@ namespace ABP.Infrastructure.Identity.Services
                 user.IsActive = true;
             }
 
-            var result = await _userManager.CreateAsync(user, saveDto.Role);
+            var result = await _userManager.CreateAsync(user, saveDto.Password!);
 
             if (result.Succeeded)
             {
-                await _userManager.AddToRoleAsync(user, saveDto.Password);
+                await _userManager.AddToRoleAsync(user, saveDto.Role!);
 
                 if (user.EmailConfirmed)
                 {
@@ -508,10 +547,11 @@ namespace ABP.Infrastructure.Identity.Services
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     Email = user.Email,
-                    Username = user.Username,
+                    DNI = user.DNI ?? "",
+                    UserName = user.UserName,
                     Password = "",
                     ConfirmPassword = "",
-                    Role = user.Role,
+                    Role = user.Roles?.FirstOrDefault() ?? "",
                     IsActive = user.IsActive
                 };
                 await EditUser(saveDto, origin, false, false);
@@ -523,7 +563,7 @@ namespace ABP.Infrastructure.Identity.Services
         {
             UserResponseDto responseDto = new()
             {
-                HasErrors = false,
+                HasError = false,
                 Errors = []
             };
 
@@ -531,7 +571,7 @@ namespace ABP.Infrastructure.Identity.Services
 
             if(user == null)
             {
-                responseDto.HasErrors = true;
+                responseDto.HasError = true;
                 responseDto.Errors.Add("No existe una cuenta registrada para este usuario.");
                 return responseDto;
             }
@@ -541,7 +581,7 @@ namespace ABP.Infrastructure.Identity.Services
 
             if (!result.Succeeded)
             {
-                responseDto.HasErrors = true;
+                responseDto.HasError = true;
                 responseDto.Errors.AddRange(result.Errors.Select(s => s.Description).ToList());
 
                 return responseDto;
