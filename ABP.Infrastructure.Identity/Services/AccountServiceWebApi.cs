@@ -3,7 +3,11 @@ using ABP.Core.Application.Interfaces;
 using ABP.Core.Domain.Common.Enums;
 using ABP.Core.Domain.Settings;
 using ABP.Infrastructure.Identity.Entities;
+using AutoMapper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -15,12 +19,14 @@ namespace ABP.Infrastructure.Identity.Services
     public class AccountServiceWebApi : BaseAccountService, IAccountServiceWebApi
     {
         private readonly UserManager<AppUser> _userManager;
+        private readonly IMapper _mapper;
         private readonly JwtSettings _jwtSettings;
 
-        public AccountServiceWebApi(UserManager<AppUser> userManager, IEmailService emailService, IOptions<JwtSettings> jwtSettings) 
+        public AccountServiceWebApi(UserManager<AppUser> userManager, IEmailService emailService, IMapper mapper, IOptions<JwtSettings> jwtSettings) 
             : base(userManager, emailService)
         {
             _userManager = userManager;
+            _mapper = mapper;
             _jwtSettings = jwtSettings.Value;
         }
 
@@ -86,6 +92,72 @@ namespace ABP.Infrastructure.Identity.Services
             responseDto.Expiration = jwtToken.ValidTo;
 
             return responseDto;
+        }
+
+        public async Task<PagedResponse<UserDto>> GetUsersAsync(UserQueryParameters queryParams)
+        {
+            int page = queryParams.Page < 1 ? 1 : queryParams.Page;
+            int limit = queryParams.Limit > 100 ? 100 : (queryParams.Limit < 1 ? 20 : queryParams.Limit);
+
+            var commerceUsers = await _userManager.GetUsersInRoleAsync(UserRoles.Commerce.ToString());
+            var commerceUsersId = commerceUsers.Select(u => u.Id).ToList();
+
+            var query = _userManager.Users.Where(u => !commerceUsersId.Contains(u.Id));
+
+            if (!string.IsNullOrWhiteSpace(queryParams.Rol))
+            {
+                var usersInRole = await _userManager.GetUsersInRoleAsync(queryParams.Rol);
+                var usersInRoleIds = usersInRole.Select(u => u.Id).ToList();
+
+                query = query.Where(u => usersInRoleIds.Contains(u.Id));
+            }
+
+            int totalRecords = await query.CountAsync();
+
+            var users = await query
+                .OrderByDescending(u => u.Id)
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .ToListAsync();
+
+            var userDto = _mapper.Map<List<UserDto>>(users);
+
+            for (int i = 0; i < users.Count; i++)
+            {
+                var roles = await _userManager.GetRolesAsync(users[i]);
+                userDto[i].Roles = roles.ToList();
+            }
+
+            return new PagedResponse<UserDto>(userDto, totalRecords, page, limit);
+        }
+
+        public async Task<PagedResponse<CommerceUserDto>> GetCommerceUsersAsync(CommerceQueryParameters queryParams)
+        {
+            int page = queryParams.Page < 1 ? 1 : queryParams.Page;
+            int limit = queryParams.PageSize > 20 ? 20 : (queryParams.PageSize < 1 ? 20 : queryParams.PageSize);
+
+            var commerceUsers = await _userManager.GetUsersInRoleAsync(UserRoles.Commerce.ToString());
+            var commerceUsersId = commerceUsers.Select(u => u.Id).ToList();
+
+            var query = _userManager.Users.Where(u => commerceUsersId.Contains(u.Id));
+
+            int totalRecords = await query.CountAsync();
+
+            var users = await query
+                .OrderByDescending(u => u.Id)
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .ToListAsync();
+
+            var userDto = _mapper.Map<List<CommerceUserDto>>(users);
+
+            for (int i = 0; i < users.Count; i++)
+            {
+                var roles = await _userManager.GetRolesAsync(users[i]);
+                userDto[i].Roles = roles.ToList();
+            }
+
+            return new PagedResponse<CommerceUserDto>(userDto, totalRecords, page, limit);
         }
 
         public override async Task<UserResponseDto> ResetPasswordAsync(ResetPasswordRequestDto requestDto)

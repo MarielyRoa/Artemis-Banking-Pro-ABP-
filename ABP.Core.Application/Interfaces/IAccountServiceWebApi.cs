@@ -10,5 +10,7 @@ namespace ABP.Core.Application.Interfaces
     public interface IAccountServiceWebApi : IBaseAccountService
     {
         Task<LoginResponseApiDto> Login(LoginDto loginDto);
+        Task<PagedResponse<UserDto>> GetUsersAsync(UserQueryParameters queryParams);
+        Task<PagedResponse<CommerceUserDto>> GetCommerceUsersAsync(CommerceQueryParameters queryParams);
     }
 }

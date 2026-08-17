@@ -77,53 +77,50 @@ namespace Artemis_Banking_Pro_WebApi.Controllers.v1
             return NoContent();
         }
 
-        [Authorize(Roles = "Admin")]
-        [HttpPost("users/commerce")]
-        [ProducesResponseType(StatusCodes.Status201Created)]
+        [AllowAnonymous]
+        [HttpPost("account/get-reset-token")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> RegisterTrade([FromBody] SaveUserDto registerDto)
+        public async Task<IActionResult> ResetToken([FromBody] ForgotPasswordApiRequestDto apiRequest)
         {
-            try
+            if (!ModelState.IsValid)
             {
-                if (!ModelState.IsValid)
-                {
-                    return BadRequest(ModelState);
-                }
-
-                if(registerDto.Password != registerDto.ConfirmPassword)
-                {
-                    return BadRequest(new { Error = "Password y la confirmacion del password no coinciden " });
-                }
-
-                registerDto.Role = UserRoles.Commerce.ToString();
-                registerDto.IsActive = true;
-
-                var result = await _accountService.RegisterUser(registerDto, null, true);
-
-                if (result.HasError)
-                {
-                    return BadRequest(result.Errors);
-                }
-
-                var user = await _userManager.FindByIdAsync(result.Id);
-                if(user != null)
-                {
-                    user.EmailConfirmed = true;
-                    user.IsActive = true;
-                    await _userManager.UpdateAsync(user);
-                }
-
-                return StatusCode(StatusCodes.Status201Created, new { Message = "Usuario comercio creado correctamente.", Id = result.Id });
-
+                return BadRequest(ModelState);
             }
-            catch(Exception ex)
+
+            var request = new ForgotPasswordRequestDto
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+                UserName = apiRequest.UserName
+            };
+
+            var response = await _accountService.ForgotPasswordAsync(request);
+
+            if (response.HasError)
+            {
+                return BadRequest(response);
             }
+
+            return NoContent();
+        }
+
+        [AllowAnonymous]
+        [HttpPost("account/reset-password")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            var response = await _accountService.ResetPasswordAsync(request);
+
+            if (response.HasError)
+            {
+                return BadRequest(response);
+            }
+
+            return NoContent();
         }
     }
 }
