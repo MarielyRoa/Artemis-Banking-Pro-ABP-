@@ -1,4 +1,6 @@
 using ABP.Core.Application.Dtos.User;
+using ABP.Core.Application.Features.Commerces.Queries.GetAllCommerces;
+using ABP.Core.Application.Features.Commerces.Queries.GetAllCommercesWithInclude;
 using ABP.Core.Application.Interfaces;
 using ABP.Core.Domain.Common.Enums;
 using ABP.Infrastructure.Identity.Entities;
@@ -62,23 +64,18 @@ namespace Artemis_Banking_Pro_WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        public async Task<IActionResult> GetCommerceUsers([FromQuery] CommerceQueryParameters queryParams)
+        public async Task<IActionResult> GetCommerceUsers()
         {
             try
             {
-                if (queryParams.Page <= 0)
+                var commerce = await Mediator.Send(new GetAllCommercesWithIncludeQuery());
+
+                if(commerce == null || commerce.Count == 0)
                 {
-                    return BadRequest("El parámetro page debe ser mayor que cero.");
+                    return NoContent();
                 }
 
-                if (queryParams.PageSize <= 0 || queryParams.PageSize > 20)
-                {
-                    return BadRequest("El parámetro pageSize debe estar entre 1 y 20.");
-                }
-
-                var response = await _accountService.GetCommerceUsersAsync(queryParams);
-
-                return Ok(response);
+                return Ok(commerce);
             }
             catch (Exception ex)
             {
