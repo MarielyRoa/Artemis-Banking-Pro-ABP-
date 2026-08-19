@@ -3,11 +3,8 @@ using ABP.Core.Application.Interfaces;
 using ABP.Core.Domain.Common.Enums;
 using ABP.Core.Domain.Settings;
 using ABP.Infrastructure.Identity.Entities;
-using AutoMapper;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -19,19 +16,21 @@ namespace ABP.Infrastructure.Identity.Services
     public class AccountServiceWebApi : BaseAccountService, IAccountServiceWebApi
     {
         private readonly UserManager<AppUser> _userManager;
-        private readonly IMapper _mapper;
         private readonly JwtSettings _jwtSettings;
+        private readonly ILogger<AccountServiceWebApi> _logger;
 
-        public AccountServiceWebApi(UserManager<AppUser> userManager, IEmailService emailService, IMapper mapper, IOptions<JwtSettings> jwtSettings) 
-            : base(userManager, emailService)
+        public AccountServiceWebApi(UserManager<AppUser> userManager, IEmailService emailService, IOptions<JwtSettings> jwtSettings, ILoggerFactory loggerFactory) 
+            : base(userManager, emailService, loggerFactory.CreateLogger<AccountServiceWebApi>())
         {
             _userManager = userManager;
-            _mapper = mapper;
             _jwtSettings = jwtSettings.Value;
+            _logger = loggerFactory.CreateLogger<AccountServiceWebApi>();
         }
 
         public async Task<LoginResponseApiDto> Login(LoginDto loginDto)
         {
+            _logger.LogInformation("Authenticating user {UserName} for API access", loginDto.UserName);
+            
             LoginResponseApiDto responseDto = new()
             {
                 Name = "",
@@ -41,17 +40,22 @@ namespace ABP.Infrastructure.Identity.Services
                 Errors = []
             };
 
+            _logger.LogInformation("Attempting to find user by username or email: {UserName}", loginDto.UserName);
             var user = await _userManager.FindByEmailAsync(loginDto.UserName) ?? await _userManager.FindByNameAsync(loginDto.UserName);
 
             if (user == null)
             {
+                _logger.LogWarning("No account registered with username: {UserName}", loginDto.UserName);
                 responseDto.HasError = true;
                 responseDto.Errors.Add($"No existe ninguna cuenta con {loginDto.UserName}");
                 return responseDto;
             }
 
+            _logger.LogInformation("User found: {UserName} - EmailConfirmed: {EmailConfirmed}", user.UserName, user.EmailConfirmed);
+
             if (!user.EmailConfirmed)
             {
+                _logger.LogWarning("Account {UserName} is not active, email confirmation required", loginDto.UserName);
                 responseDto.HasError = true;
                 responseDto.Errors.Add($"La cuenta no está activada. Confirme su correo electrónico.");
                 return responseDto;
@@ -59,15 +63,18 @@ namespace ABP.Infrastructure.Identity.Services
 
             if (!user.IsActive)
             {
+                _logger.LogWarning("Account {UserName} is inactive", loginDto.UserName);
                 responseDto.HasError = true;
                 responseDto.Errors.Add($"La cuenta está inactiva.");
                 return responseDto;
             }
 
+            _logger.LogInformation("Attempting to verify password for user {UserName}", loginDto.UserName);
             var result = await _userManager.CheckPasswordAsync(user, loginDto.Password);
 
             if(!result)
             {
+                _logger.LogWarning("Invalid credentials for user: {UserName}", loginDto.UserName);
                 responseDto.HasError= true;
                 responseDto.Errors.Add($"Credenciales inválidas para el usuario {loginDto.UserName}");
                 return responseDto;
@@ -77,11 +84,13 @@ namespace ABP.Infrastructure.Identity.Services
 
             if (!roleList.Contains(UserRoles.Admin.ToString()) && !roleList.Contains(UserRoles.Commerce.ToString()))
             {
+                _logger.LogWarning("User {UserName} does not have required permissions for Web API. Roles: {Roles}", loginDto.UserName, string.Join(",", roleList));
                 responseDto.HasError = true;
                 responseDto.Errors.Add("No tiene permisos para acceder a la API web.");
                 return responseDto;
             }
 
+            _logger.LogInformation("User {UserName} authenticated successfully. Generating JWT Token.", loginDto.UserName);
             JwtSecurityToken jwtToken = await GenerateJwtToken(user);
 
             responseDto.Name = user.Name;
@@ -92,72 +101,6 @@ namespace ABP.Infrastructure.Identity.Services
             responseDto.Expiration = jwtToken.ValidTo;
 
             return responseDto;
-        }
-
-        public async Task<PagedResponse<UserDto>> GetUsersAsync(UserQueryParameters queryParams)
-        {
-            int page = queryParams.Page < 1 ? 1 : queryParams.Page;
-            int limit = queryParams.Limit > 100 ? 100 : (queryParams.Limit < 1 ? 20 : queryParams.Limit);
-
-            var commerceUsers = await _userManager.GetUsersInRoleAsync(UserRoles.Commerce.ToString());
-            var commerceUsersId = commerceUsers.Select(u => u.Id).ToList();
-
-            var query = _userManager.Users.Where(u => !commerceUsersId.Contains(u.Id));
-
-            if (!string.IsNullOrWhiteSpace(queryParams.Rol))
-            {
-                var usersInRole = await _userManager.GetUsersInRoleAsync(queryParams.Rol);
-                var usersInRoleIds = usersInRole.Select(u => u.Id).ToList();
-
-                query = query.Where(u => usersInRoleIds.Contains(u.Id));
-            }
-
-            int totalRecords = await query.CountAsync();
-
-            var users = await query
-                .OrderByDescending(u => u.Id)
-                .Skip((page - 1) * limit)
-                .Take(limit)
-                .ToListAsync();
-
-            var userDto = _mapper.Map<List<UserDto>>(users);
-
-            for (int i = 0; i < users.Count; i++)
-            {
-                var roles = await _userManager.GetRolesAsync(users[i]);
-                userDto[i].Roles = roles.ToList();
-            }
-
-            return new PagedResponse<UserDto>(userDto, totalRecords, page, limit);
-        }
-
-        public async Task<PagedResponse<CommerceUserDto>> GetCommerceUsersAsync(CommerceQueryParameters queryParams)
-        {
-            int page = queryParams.Page < 1 ? 1 : queryParams.Page;
-            int limit = queryParams.PageSize > 20 ? 20 : (queryParams.PageSize < 1 ? 20 : queryParams.PageSize);
-
-            var commerceUsers = await _userManager.GetUsersInRoleAsync(UserRoles.Commerce.ToString());
-            var commerceUsersId = commerceUsers.Select(u => u.Id).ToList();
-
-            var query = _userManager.Users.Where(u => commerceUsersId.Contains(u.Id));
-
-            int totalRecords = await query.CountAsync();
-
-            var users = await query
-                .OrderByDescending(u => u.Id)
-                .Skip((page - 1) * limit)
-                .Take(limit)
-                .ToListAsync();
-
-            var userDto = _mapper.Map<List<CommerceUserDto>>(users);
-
-            for (int i = 0; i < users.Count; i++)
-            {
-                var roles = await _userManager.GetRolesAsync(users[i]);
-                userDto[i].Roles = roles.ToList();
-            }
-
-            return new PagedResponse<CommerceUserDto>(userDto, totalRecords, page, limit);
         }
 
         public override async Task<UserResponseDto> ResetPasswordAsync(ResetPasswordRequestDto requestDto)

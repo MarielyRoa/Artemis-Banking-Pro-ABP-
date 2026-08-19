@@ -6,6 +6,7 @@ using ABP.Infrastructure.Identity.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Text;
 
 namespace ABP.Infrastructure.Identity.Services
@@ -14,11 +15,13 @@ namespace ABP.Infrastructure.Identity.Services
     {
         private readonly UserManager<AppUser> _userManager;
         private readonly IEmailService _emailService;
+        private readonly ILogger _baseAccountServiceLogger;
 
-        public BaseAccountService(UserManager<AppUser> userManager, IEmailService emailService)
+        public BaseAccountService(UserManager<AppUser> userManager, IEmailService emailService, ILogger loggerService)
         {
             _userManager = userManager;
             _emailService = emailService;
+            _baseAccountServiceLogger = loggerService;
         }
 
         public virtual async Task<UserResponseDto> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
@@ -37,7 +40,7 @@ namespace ABP.Infrastructure.Identity.Services
                 responseDto.Errors.Add("No existe una cuenta registrada para este usuario.");
             }
 
-            var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            var result = await _userManager.ChangePasswordAsync(user!, currentPassword, newPassword);
 
             if (!result.Succeeded)
             {
@@ -251,21 +254,6 @@ namespace ABP.Infrastructure.Identity.Services
 
             AppUser? user = null;
 
-            if (request is ForgotPasswordApiRequestDto apiRequest && !string.IsNullOrWhiteSpace(apiRequest.EmailOrUserName))
-            {
-                string input = apiRequest.EmailOrUserName.Trim();
-
-                // Buscar por email si contiene '@', de lo contrario buscar por username
-                if (input.Contains("@"))
-                {
-                    user = await _userManager.FindByEmailAsync(input);
-                }
-                else
-                {
-                    user = await _userManager.FindByNameAsync(input);
-                }
-            }
-
             if (!string.IsNullOrWhiteSpace(request.UserName))
             {
                 user = await _userManager.FindByNameAsync(request.UserName);
@@ -276,7 +264,7 @@ namespace ABP.Infrastructure.Identity.Services
                 user = await _userManager.FindByEmailAsync(request.Email);
             }
 
-            if(user == null || string.IsNullOrEmpty(user.Email))
+            if(user == null)
             {
                 responseDto.HasError = true;
                 responseDto.Errors.Add("No existe una cuenta registrada para este usuario.");
@@ -285,29 +273,28 @@ namespace ABP.Infrastructure.Identity.Services
             }
 
             user.EmailConfirmed = false;
+            user.IsActive = false;
 
             await _userManager.UpdateAsync(user);
 
-            if(isApi.HasValue && !isApi.Value)
+            if(isApi != null && !isApi.Value)
             {
-                string resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-
+                var resetUri = await GetResetPasswordUri(user, request.Origin ?? "");
                 await _emailService.SendAsync(new EmailRequestDto()
                 {
                     To = user.Email,
-                    HtmlBody = $"Por favor restablezca su contraseña usando este token: <h3>{resetToken}</h3>",
-                    Subject = "Restablecer contraseña - Artemis Banking"
+                    HtmlBody = $"Por favor restablezca su contraseña visitando este enlace: {resetUri}",
+                    Subject = "Restablecer contraseña - Artemis Banking Pro"
                 });
             }
             else
             {
-                var resetUri = await GetResetPasswordUri(user, request.Origin ?? "");
-
+                string? resetToken = await GetResetPasswordToken(user);
                 await _emailService.SendAsync(new EmailRequestDto()
                 {
                     To = user.Email,
-                    HtmlBody = $"Por favor restablezca su contraseña visitando este enlace: <a href='{resetUri}'>Restablecer Contraseña</a>",
-                    Subject = "Restablecer contraseña - Artemis Banking"
+                    HtmlBody = $"Por favor restablezca su contraseña usando este token: {resetToken}",
+                    Subject = "Restablecer contraseña - Artemis Banking Pro"
                 });
             }
 
@@ -444,7 +431,7 @@ namespace ABP.Infrastructure.Identity.Services
 
             RegisterResponseDto responseDto = new()
             {
-                Id = saveDto.Id,
+                Id = saveDto.Id ?? "",
                 FirstName = "",
                 LastName = "",
                 UserName = "",
@@ -453,17 +440,11 @@ namespace ABP.Infrastructure.Identity.Services
                 Errors = []
             };
 
-            var allowedRoles = new[] { UserRoles.Admin.ToString(), UserRoles.Cashier.ToString(), UserRoles.Client.ToString() };
-            if (!allowedRoles.Contains(saveDto.Role, StringComparer.OrdinalIgnoreCase))
-            {
-                responseDto.HasError = true;
-                responseDto.Errors.Add("El rol especificado no es válido para este registro.");
-                return responseDto;
-            }
-
+            _baseAccountServiceLogger.LogInformation("Registering user {UserName} for web access", saveDto.UserName);
             var userWithSameUsername = await _userManager.FindByNameAsync(saveDto.UserName!);
             if (userWithSameUsername != null)
             {
+                _baseAccountServiceLogger.LogWarning("Username {UserName} is already taken", saveDto.UserName);
                 responseDto.HasError = true;
                 responseDto.Errors.Add($"El nombre de usuario ya existe");
 
@@ -473,6 +454,7 @@ namespace ABP.Infrastructure.Identity.Services
             var userWithSameEmail = await _userManager.FindByEmailAsync(saveDto.Email!);
             if (userWithSameEmail != null)
             {
+                _baseAccountServiceLogger.LogWarning("Email {Email} is already taken", saveDto.Email);
                 responseDto.HasError = true;
                 responseDto.Errors.Add($"Ya existe un usuario con este email.");
 
@@ -494,26 +476,24 @@ namespace ABP.Infrastructure.Identity.Services
             {
                 Name = saveDto.FirstName ?? "",
                 LastName = saveDto.LastName ?? "",
+                UserName = saveDto.UserName ?? "",
                 Identification = saveDto.DNI,
                 Email = saveDto.Email,
                 ProfileImage = saveDto.PhotoUrl ?? string.Empty,
-                EmailConfirmed = false,
-                IsActive = false
+                EmailConfirmed = false
             };
 
-            if(saveDto.Role == UserRoles.Admin.ToString())
-            {
-                user.EmailConfirmed = true;
-                user.IsActive = true;
-            }
+            // All users created from the system start inactive (only seeded users are active)
 
+            _baseAccountServiceLogger.LogInformation("Creating user {UserName} with email {Email}", saveDto.UserName, saveDto.Email);
             var result = await _userManager.CreateAsync(user, saveDto.Password!);
 
+            _baseAccountServiceLogger.LogInformation("User creation result for {UserName}: {Succeeded}", saveDto.UserName, result.Succeeded);
             if (result.Succeeded)
             {
                 await _userManager.AddToRoleAsync(user, saveDto.Role!);
 
-                if (user.EmailConfirmed)
+                if (!user.EmailConfirmed)
                 {
                     if(isApi != null && !isApi.Value)
                     {
@@ -593,9 +573,9 @@ namespace ABP.Infrastructure.Identity.Services
                 Errors = []
             };
 
-            var user = await _userManager.FindByIdAsync(request.UserId);
+            var user = await _userManager.FindByEmailAsync(request.Email);
 
-            if(user == null || string.IsNullOrEmpty(user.UserName) || string.IsNullOrEmpty(user.Email))
+            if(user == null)
             {
                 responseDto.HasError = true;
                 responseDto.Errors.Add("No existe una cuenta registrada para este usuario.");
@@ -614,8 +594,8 @@ namespace ABP.Infrastructure.Identity.Services
             }
 
             user.EmailConfirmed = true;
+            user.IsActive = true;
             await _userManager.UpdateAsync(user);
-
             return responseDto;
         }
 
@@ -625,7 +605,7 @@ namespace ABP.Infrastructure.Identity.Services
         {
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             token = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
-            var route = "/Login/ConfirmEmail";
+            var route = "/Account/ConfirmEmail";
             var completeUrl = new Uri(string.Concat(origin, "/", route));
             var verificationUri = QueryHelpers.AddQueryString(completeUrl.ToString(), "userId", user.Id);
             verificationUri = QueryHelpers.AddQueryString(verificationUri.ToString(), "token", token);
@@ -637,7 +617,7 @@ namespace ABP.Infrastructure.Identity.Services
         {
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
             token = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
-            var route = "/Login/ResetPassword";
+            var route = "/Account/ResetPassword";
             var completeUrl = new Uri(string.Concat(origin, "/", route));
             var resetUri = QueryHelpers.AddQueryString(completeUrl.ToString(), "token", token);
 
