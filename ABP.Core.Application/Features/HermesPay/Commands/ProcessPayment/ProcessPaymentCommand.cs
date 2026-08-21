@@ -1,6 +1,5 @@
 using ABP.Core.Application.Dtos.Email;
 using ABP.Core.Application.Exceptions;
-using ABP.Core.Application.Features.HermesPay.Commands.ProcessPayment.EmailTemplates;
 using ABP.Core.Application.Helpers;
 using ABP.Core.Application.Interfaces;
 using ABP.Core.Domain.Common.Enums;
@@ -252,7 +251,7 @@ namespace ABP.Core.Application.Features.HermesPay.Commands.ProcessPayment
                     {
                         To = cardOwner.Email,
                         Subject = $"Consumo realizado con la tarjeta {lastFour}",
-                        HtmlBody = PaymentApprovedEmails.CardHolderEmail(
+                        HtmlBody = EmailTemplates.HermesPayCardHolderApproved(
                             cardOwner.FirstName, commerce.Name, amount,
                             creditCard.CurrentDebt, lastFour, dateTime)
                     });
@@ -273,7 +272,7 @@ namespace ABP.Core.Application.Features.HermesPay.Commands.ProcessPayment
                     {
                         To = commerceUser.Email,
                         Subject = $"Pago recibido a través de tarjeta {lastFour}",
-                        HtmlBody = PaymentApprovedEmails.CommerceEmail(
+                        HtmlBody = EmailTemplates.HermesPayCommerceReceived(
                             commerce.Name, amount, lastFour, dateTime)
                     });
                 }
@@ -295,7 +294,7 @@ namespace ABP.Core.Application.Features.HermesPay.Commands.ProcessPayment
                     {
                         To = cardOwner.Email,
                         Subject = $"Pago rechazado en {commerce.Name} - Tarjeta {lastFour}",
-                        HtmlBody = PaymentRejectedEmails.CardHolderEmail(
+                        HtmlBody = EmailTemplates.HermesPayCardHolderRejected(
                             cardOwner.FirstName, commerce.Name, amount,
                             availableCredit, DateTime.Now.ToString("dd/MM/yyyy HH:mm"))
                     });
